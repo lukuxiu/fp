@@ -219,6 +219,81 @@ body {
 .pagination { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 14px; }
 .katex-display { overflow-x: auto; overflow-y: hidden; padding: 4px 0; }
 
+/* Maki /knowledge 2D Treemap Canvas */
+.km-toolbar {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 10px 14px; margin-bottom: 12px;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+}
+.km-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.km-legend { display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+.lg-dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; margin-right: 4px; vertical-align: middle; }
+.lg-dot.unmastered { background: var(--surface-subtle); border: 1px solid var(--border); }
+.lg-dot.mastered { background: var(--blue); }
+.lg-dot.prereq { background: var(--orange); }
+.lg-dot.succ { background: var(--teal); }
+
+.km-viewport {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  height: calc(100vh - 175px); min-height: 520px; overflow: hidden; position: relative;
+  cursor: grab; user-select: none;
+  background-image: radial-gradient(var(--border) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+.km-viewport:active { cursor: grabbing; }
+.km-canvas {
+  transform-origin: 0 0;
+  padding: 18px;
+  width: 1260px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.km-partition {
+  background: rgba(248, 250, 252, 0.85);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+}
+html.dark .km-partition { background: rgba(17, 24, 39, 0.85); }
+.km-part-head {
+  display: flex; justify-content: space-between; align-items: center;
+  font-weight: 800; font-size: 14px; margin-bottom: 10px; padding-bottom: 6px;
+  border-bottom: 1px dashed var(--border);
+}
+.km-subgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(265px, 1fr));
+  gap: 10px;
+}
+.km-subpart {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 9px;
+}
+.km-sub-head {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 12.5px; font-weight: 700; color: var(--muted); margin-bottom: 7px;
+}
+.km-nodes { display: flex; flex-wrap: wrap; gap: 6px; }
+.km-node {
+  flex: 1 1 115px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  transition: transform 0.1s, border-color 0.15s, background 0.15s;
+  text-align: left;
+}
+.km-node:hover { transform: translateY(-1px); border-color: var(--blue); }
+.km-node.mastered { background: var(--blue-bg); border-color: var(--blue); color: var(--blue); }
+.km-node.prereq { background: var(--orange-bg); border-color: var(--orange); color: var(--orange); box-shadow: 0 0 0 2px rgba(217,119,6,0.18); }
+.km-node.succ { background: var(--teal-bg); border-color: var(--teal); color: var(--teal); box-shadow: 0 0 0 2px rgba(13,148,136,0.18); }
+.km-node-meta { font-size: 10.5px; font-weight: 500; color: var(--muted); margin-top: 2px; }
+
 @media (max-width: 860px) {
   .app-shell { flex-direction: column; }
   .rail { width: 100%; height: auto; position: static; border-right: none; border-bottom: 1px solid var(--border); }

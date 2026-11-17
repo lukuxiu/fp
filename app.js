@@ -1,10 +1,14 @@
 const state = {
-  tab: "overview",
+  tab: "knowledge",
   chapIdx: 0,
   notes: null,
   exams: [],
   mastered: new Set(JSON.parse(localStorage.getItem("fp_mastered_v1") || "[]")),
   filters: { q: "", exam: "all", era: "all", subj: "all", chap: "all", coreOnly: false },
+  kmFilter: { q: "", status: "all" },
+  kmZoom: 0.78,
+  kmPan: { x: 10, y: 10 },
+  kmHighlight: null, // { key, prereqKeys: Set, succKeys: Set }
   page: 1,
   pageSize: 30,
   modalList: [],
@@ -110,7 +114,7 @@ function renderMathInEl(el) {
 function updateRail() {
   document.querySelectorAll(".rail-item").forEach((b) => b.classList.toggle("active", b.dataset.tab === state.tab));
   const rc = document.getElementById("railChapters");
-  if (!state.notes || state.tab === "overview" || state.tab === "bank") {
+  if (!state.notes || state.tab === "overview" || state.tab === "bank" || state.tab === "knowledge") {
     rc.innerHTML = "";
     return;
   }
@@ -126,13 +130,118 @@ function updateRail() {
 
 function updateBreadcrumb() {
   const bc = document.getElementById("breadcrumb");
-  if (state.tab === "overview") bc.textContent = "APP / 全局总览";
+  if (state.tab === "knowledge") bc.textContent = "APP / 知识库 / 考研数学知识地图";
+  else if (state.tab === "overview") bc.textContent = "APP / 全局总览";
   else if (state.tab === "bank") bc.textContent = "APP / 题库 / 1987–2026 历年真题";
   else if (state.notes) {
     const subj = state.notes.subjects.find((s) => s.key === state.tab);
     const ch = subj && subj.chapters[state.chapIdx];
     bc.textContent = `APP / 复盘讲义 / ${state.tab}${ch ? " / " + ch.name : ""}`;
   }
+}
+
+function getAllKnowledgeNodes() {
+  const list = [];
+  if (!state.notes) return list;
+  for (const subj of state.notes.subjects) {
+    subj.chapters.forEach((ch, ci) => {
+      ch.knowledge.forEach((k, ki) => {
+        list.push({
+          key: `k:${subj.key}:${ch.name}:${ki}`,
+          subjKey: subj.key,
+          chapIdx: ci,
+          kIdx: ki,
+          chName: ch.name,
+          k,
+          ch,
+        });
+      });
+    });
+  }
+  return list;
+}
+
+function renderKnowledgeMap() {
+  const allNodes = getAllKnowledgeNodes();
+  const masteredNodes = allNodes.filter((n) => state.mastered.has(n.key)).length;
+  const kw = state.kmFilter.q.trim().toLowerCase();
+  const st = state.kmFilter.status;
+  const hl = state.kmHighlight;
+
+  return `
+    <div class="km-toolbar">
+      <div class="km-controls">
+        <input id="kmSearchInput" placeholder="搜索知识点标题或公式..." value="${escHtml(state.kmFilter.q)}" oninput="onKmSearch(this.value)" style="border:1px solid var(--border);background:var(--surface-subtle);color:var(--text);border-radius:6px;padding:5px 10px;font-size:13px;min-width:200px;" />
+        <select onchange="onKmStatus(this.value)" style="border:1px solid var(--border);background:var(--surface-subtle);color:var(--text);border-radius:6px;padding:5px 8px;font-size:13px;">
+          <option value="all" ${st==="all"?"selected":""}>全部节点 (${allNodes.length})</option>
+          <option value="unmastered" ${st==="unmastered"?"selected":""}>未掌握 (${allNodes.length - masteredNodes})</option>
+          <option value="mastered" ${st==="mastered"?"selected":""}>已掌握 (${masteredNodes})</option>
+        </select>
+        <span class="pill-badge" style="margin:0;">已掌握 ${masteredNodes} / ${allNodes.length}</span>
+        ${hl ? `<button class="maki-btn" onclick="clearKmHighlight()">清除引用高亮</button>` : ""}
+      </div>
+      <div class="km-controls">
+        <div class="km-legend">
+          <span><i class="lg-dot unmastered"></i>未掌握</span>
+          <span><i class="lg-dot mastered"></i>已掌握</span>
+          <span><i class="lg-dot prereq"></i>前置</span>
+          <span><i class="lg-dot succ"></i>后续</span>
+        </div>
+        <button class="maki-btn" onclick="zoomKm(-0.12)">-</button>
+        <span style="font-size:12px;color:var(--muted);min-width:38px;text-align:center;">${Math.round(state.kmZoom * 100)}%</span>
+        <button class="maki-btn" onclick="zoomKm(0.12)">+</button>
+        <button class="maki-btn" onclick="resetKmView()">全览</button>
+      </div>
+    </div>
+
+    <div class="km-viewport" id="kmViewport">
+      <div class="km-canvas" id="kmCanvas" style="transform: translate(${state.kmPan.x}px, ${state.kmPan.y}px) scale(${state.kmZoom});">
+        ${state.notes.subjects.map((subj) => `
+          <div class="km-partition">
+            <div class="km-part-head">
+              <span>${escHtml(subj.key)} · 分区</span>
+              <span class="stat-lbl">${subj.chapters.length} 个子分区</span>
+            </div>
+            <div class="km-subgrid">
+              ${subj.chapters.map((ch, ci) => {
+                const chapCount = state.exams.filter((r) => r.subj === subj.key && r.ch === ch.name).length;
+                const nodes = ch.knowledge.map((k, ki) => ({ k, ki, key: `k:${subj.key}:${ch.name}:${ki}` })).filter(({ k, key }) => {
+                  const isM = state.mastered.has(key);
+                  if (st === "mastered" && !isM) return false;
+                  if (st === "unmastered" && isM) return false;
+                  if (kw && !(k.title + " " + k.content + " " + ch.name).toLowerCase().includes(kw)) return false;
+                  return true;
+                });
+                if (nodes.length === 0) return "";
+                return `
+                  <div class="km-subpart">
+                    <div class="km-sub-head">
+                      <span>${escHtml(ch.name)}</span>
+                      <span>${chapCount} 题</span>
+                    </div>
+                    <div class="km-nodes">
+                      ${nodes.map(({ k, ki, key }) => {
+                        const isM = state.mastered.has(key);
+                        let cls = isM ? "mastered" : "";
+                        if (hl && hl.prereqKeys.has(key)) cls += " prereq";
+                        if (hl && hl.succKeys.has(key)) cls += " succ";
+                        return `
+                          <button class="km-node ${cls}" onclick="openKnowledgeModal('${subj.key}', ${ci}, ${ki})">
+                            <div>${escHtml(k.title)}</div>
+                            <div class="km-node-meta">${isM ? "✓ 已掌握" : "点击学习"} · ${ch.cases.length} 例精讲</div>
+                          </button>
+                        `;
+                      }).join("")}
+                    </div>
+                  </div>
+                `;
+              }).join("")}
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  `;
 }
 
 function renderOverview() {
@@ -434,22 +543,143 @@ window.openSubGroupModal = (subIdx, idx) => {
   renderModal();
 };
 
+window.openKnowledgeModal = (subjKey, chapIdx, kIdx) => {
+  const subj = state.notes.subjects.find((s) => s.key === subjKey);
+  const ch = subj.chapters[chapIdx];
+  const k = ch.knowledge[kIdx];
+  const mKey = `k:${subjKey}:${ch.name}:${kIdx}`;
+  const done = state.mastered.has(mKey);
+  const chapExams = state.exams.filter((r) => r.subj === subjKey && r.ch === ch.name);
+
+  state.modalIndex = -1;
+  document.getElementById("mTitle").textContent = `${k.title}`;
+  document.getElementById("mStars").textContent = `${subjKey} · ${ch.name}`;
+  document.getElementById("mFootInfo").textContent = `本章共 ${chapExams.length} 道真题`;
+  document.getElementById("mPrevBtn").disabled = true;
+  document.getElementById("mNextBtn").disabled = true;
+
+  const body = document.getElementById("mBody");
+  body.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+      <div>
+        <span class="pill-badge">${escHtml(subjKey)} / ${escHtml(ch.name)}</span>
+        <span class="pill-badge purple">${done ? "已掌握" : "未掌握 · 保存在本浏览器"}</span>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="maki-btn" onclick="highlightRelations('${subjKey}', ${chapIdx}, ${kIdx})">查看引用关系</button>
+        <button class="maki-btn ${done ? "done" : ""}" onclick="toggleMastered('${mKey}'); openKnowledgeModal('${subjKey}', ${chapIdx}, ${kIdx});">${done ? "✓ 已掌握" : "标记为已掌握"}</button>
+        <button class="maki-btn" onclick="enterChapterLecture('${subjKey}', ${chapIdx})">进入本章讲义 →</button>
+      </div>
+    </div>
+
+    <div class="callout blue">
+      <div class="callout-head"><span class="callout-tag">定理 / 公式 · ${escHtml(k.title)}</span></div>
+      <div class="chain-line">直接前置 / 后续：${escHtml(k.chain)}</div>
+      <div>${renderMathMarkdown(k.content)}</div>
+    </div>
+
+    <div class="callout orange">
+      <div class="callout-head"><span class="callout-tag">提醒 / 易错边界</span></div>
+      <ul style="margin:0;padding-left:18px;">${ch.pitfalls.map((p) => `<li>${renderMathMarkdown(p)}</li>`).join("")}</ul>
+    </div>
+
+    <div style="font-weight:700;margin:12px 0 8px;">🎯 对应真题演练（点击题目进入详解与最优解）</div>
+    <div class="q-list">
+      ${ch.cases.map((c, idx) => `
+        <div class="q-row" onclick="openCaseModal('${subjKey}', ${chapIdx}, ${idx})">
+          <span class="q-doc-icon">📄</span>
+          <span class="q-row-id">#${c.id}</span>
+          <span class="q-row-src">${escHtml(c.src)}</span>
+          <span class="q-row-preview">${escHtml(c.title)}</span>
+          <span class="q-row-diff">难度 ${c.stars} / 5</span>
+        </div>
+      `).join("")}
+    </div>
+  `;
+  document.getElementById("qModalBackdrop").classList.remove("hidden");
+};
+
+window.highlightRelations = (subjKey, chapIdx, kIdx) => {
+  const subj = state.notes.subjects.find((s) => s.key === subjKey);
+  const ch = subj.chapters[chapIdx];
+  const curKey = `k:${subjKey}:${ch.name}:${kIdx}`;
+  const prereqKeys = new Set();
+  const succKeys = new Set();
+  ch.knowledge.forEach((_, i) => {
+    const key = `k:${subjKey}:${ch.name}:${i}`;
+    if (i < kIdx) prereqKeys.add(key);
+    else if (i > kIdx) succKeys.add(key);
+  });
+  if (chapIdx > 0) {
+    const prevCh = subj.chapters[chapIdx - 1];
+    prevCh.knowledge.forEach((_, i) => prereqKeys.add(`k:${subjKey}:${prevCh.name}:${i}`));
+  }
+  if (chapIdx + 1 < subj.chapters.length) {
+    const nextCh = subj.chapters[chapIdx + 1];
+    nextCh.knowledge.forEach((_, i) => succKeys.add(`k:${subjKey}:${nextCh.name}:${i}`));
+  }
+  state.kmHighlight = { key: curKey, prereqKeys, succKeys };
+  document.getElementById("qModalBackdrop").classList.add("hidden");
+  render();
+};
+
+window.clearKmHighlight = () => { state.kmHighlight = null; render(); };
+window.enterChapterLecture = (subjKey, chapIdx) => {
+  document.getElementById("qModalBackdrop").classList.add("hidden");
+  state.tab = subjKey;
+  state.chapIdx = chapIdx;
+  render();
+};
+window.onKmSearch = (v) => { state.kmFilter.q = v; render(); };
+window.onKmStatus = (v) => { state.kmFilter.status = v; render(); };
+window.zoomKm = (delta) => { state.kmZoom = Math.min(1.5, Math.max(0.45, +(state.kmZoom + delta).toFixed(2))); render(); };
+window.resetKmView = () => { state.kmZoom = 0.78; state.kmPan = { x: 10, y: 10 }; render(); };
+
+function bindKmPanZoom() {
+  const vp = document.getElementById("kmViewport");
+  if (!vp) return;
+  let dragging = false, sx = 0, sy = 0, ox = 0, oy = 0;
+  vp.addEventListener("mousedown", (e) => {
+    if (e.target.closest("button")) return;
+    dragging = true;
+    sx = e.clientX; sy = e.clientY;
+    ox = state.kmPan.x; oy = state.kmPan.y;
+  });
+  window.addEventListener("mousemove", (e) => {
+    if (!dragging) return;
+    state.kmPan.x = ox + (e.clientX - sx);
+    state.kmPan.y = oy + (e.clientY - sy);
+    const cv = document.getElementById("kmCanvas");
+    if (cv) cv.style.transform = `translate(${state.kmPan.x}px, ${state.kmPan.y}px) scale(${state.kmZoom})`;
+  });
+  window.addEventListener("mouseup", () => { dragging = false; });
+  vp.addEventListener("wheel", (e) => {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      window.zoomKm(e.deltaY < 0 ? 0.08 : -0.08);
+    }
+  }, { passive: false });
+}
+
 function render() {
   const root = document.getElementById("appRoot");
   if (!state.notes) return;
   const activeId = document.activeElement && document.activeElement.id;
-  const selStart = activeId === "searchInput" ? document.activeElement.selectionStart : null;
+  const selStart = (activeId === "searchInput" || activeId === "kmSearchInput") ? document.activeElement.selectionStart : null;
 
   updateRail();
   updateBreadcrumb();
 
-  if (state.tab === "overview") root.innerHTML = renderOverview();
+  if (state.tab === "knowledge") {
+    root.innerHTML = renderKnowledgeMap();
+    bindKmPanZoom();
+  } else if (state.tab === "overview") root.innerHTML = renderOverview();
   else if (state.tab === "bank") root.innerHTML = renderBank();
   else root.innerHTML = renderSubjectLecture(state.tab);
   renderMathInEl(root);
 
-  if (activeId === "searchInput") {
-    const inp = document.getElementById("searchInput");
+  if (activeId === "searchInput" || activeId === "kmSearchInput") {
+    const inp = document.getElementById(activeId);
     if (inp) {
       inp.focus();
       if (selStart !== null) inp.setSelectionRange(selStart, selStart);
