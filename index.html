@@ -3,39 +3,65 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>考研数学真题复盘 · 大观园 × Maki 讲义版 (1987–2026)</title>
+  <title>FP // MATH — 考研数学真题复盘讲义与题库</title>
   <link rel="stylesheet" href="./vendor/katex/katex.min.css" />
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
-  <header class="topbar">
-    <div class="topbar-inner">
-      <div class="brand">
-        <span class="brand-badge">FP</span>
-        <div>
-          <div class="brand-title">考研数学真题复盘</div>
-          <div class="brand-sub">大观园分类 × Maki 讲义 · 1987–2026 全量 2,872 题</div>
-        </div>
+  <div class="app-shell">
+    <aside class="rail" id="leftRail">
+      <div class="rail-brand">
+        <span class="rail-logo">FP // MATH</span>
+        <span class="rail-ver">1987–2026</span>
       </div>
-
-      <nav class="nav-tabs" id="navTabs">
-        <button class="tab-btn active" data-tab="overview">📊 全局总览</button>
-        <button class="tab-btn" data-tab="高等数学">∫ 高等数学</button>
-        <button class="tab-btn" data-tab="线性代数">📐 线性代数</button>
-        <button class="tab-btn" data-tab="概率统计">🎲 概率统计</button>
-        <button class="tab-btn" data-tab="bank">🔍 全量真题库 (2,872)</button>
+      <div class="rail-section-label">NAVIGATION</div>
+      <nav class="rail-nav" id="railNav">
+        <button class="rail-item active" data-tab="overview">📊 全局总览</button>
+        <button class="rail-item" data-tab="高等数学">∫ 高等数学 (8章)</button>
+        <button class="rail-item" data-tab="线性代数">📐 线性代数 (7章)</button>
+        <button class="rail-item" data-tab="概率统计">🎲 概率统计 (P01–P08)</button>
+        <button class="rail-item" data-tab="bank">📚 全部真题库 (2,872)</button>
       </nav>
+      <div class="rail-chapters" id="railChapters"></div>
+    </aside>
 
-      <div class="topbar-actions">
-        <span class="progress-pill" id="progressPill">已掌握 0</span>
-        <button class="icon-btn" id="themeToggle" title="切换明暗主题">🌓</button>
+    <div class="main-col">
+      <header class="maki-topbar">
+        <div class="breadcrumb" id="breadcrumb">APP / 全局总览</div>
+        <div class="topbar-right">
+          <button class="kbd-search" id="quickSearchBtn" title="跳转全库搜索 (Ctrl+K)">
+            <span>🔍 搜索题号、考点或公式…</span>
+            <kbd>Ctrl+K</kbd>
+          </button>
+          <span class="mastery-pill" id="progressPill">已掌握 0</span>
+          <button class="maki-icon-btn" id="themeToggle" title="切换明暗主题">🌓</button>
+        </div>
+      </header>
+
+      <main class="maki-content" id="appRoot">
+        <div class="loading-box">正在加载 2,872 道真题与讲义数据…</div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Maki-style Question Detail Modal -->
+  <div class="modal-backdrop hidden" id="qModalBackdrop">
+    <div class="modal-card" role="dialog" aria-modal="true">
+      <div class="modal-head">
+        <div class="modal-title-row">
+          <span class="modal-title" id="mTitle">题目详情</span>
+          <span class="modal-stars" id="mStars"></span>
+        </div>
+        <button class="maki-icon-btn" id="mCloseBtn" title="关闭">✕</button>
+      </div>
+      <div class="modal-body" id="mBody"></div>
+      <div class="modal-foot">
+        <button class="maki-btn" id="mPrevBtn">← 上一题</button>
+        <span class="modal-foot-info" id="mFootInfo"></span>
+        <button class="maki-btn" id="mNextBtn">下一题 →</button>
       </div>
     </div>
-  </header>
-
-  <main class="container" id="appRoot">
-    <div class="loading-box">正在加载 2,872 道真题与复盘讲义数据...</div>
-  </main>
+  </div>
 
   <script src="./vendor/katex/katex.min.js"></script>
   <script src="./vendor/katex/contrib/auto-render.min.js"></script>
