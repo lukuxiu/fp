@@ -35,6 +35,9 @@ function renderMathMarkdown(content, questionId) {
   if (!content) return "";
   let str = String(content);
 
+  // 0. Promote multiline single-$ blocks containing \begin{...} to $$...$$
+  str = str.replace(/(?<!\$)\$(?!\$)([\s\S]*?\\begin\{[\s\S]*?\\end\{[^}]+\}[\s\S]*?)(?<!\$)\$(?!\$)/g, (_, inner) => `$$${inner}$$`);
+
   // 1. Render block math $$...$$ and \[...\] first
   const blocks = [];
   str = str.replace(/\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\]/g, (full, m1, m2) => {
@@ -78,7 +81,7 @@ function renderMathMarkdown(content, questionId) {
       cleanUrl = `https://cxyonly.fans/api/v1/questions/${questionId}/assets/${shaMatch[1]}`;
     }
     if (/^(https?:\/\/|\.\/|\/)/.test(cleanUrl)) {
-      images.push(`<img src="${cleanUrl}" alt="${safeAlt}" referrerpolicy="no-referrer" loading="lazy" style="max-width:100%;max-height:320px;border-radius:8px;border:1px solid var(--border);background:#fff;padding:4px;margin:6px 0;display:block;" />`);
+      images.push(`<img src="${cleanUrl}" alt="${safeAlt}" referrerpolicy="no-referrer" loading="lazy" style="max-width:100%;max-height:320px;border-radius:8px;border:1px solid var(--border);background:#fff;padding:4px;margin:6px 0;display:block;" onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='inline-block';" /><span class="pill-badge" style="display:none;">🖼️ ${escHtml(safeAlt)}</span>`);
     } else {
       images.push(`<span class="pill-badge">🖼️ ${escHtml(safeAlt)}</span>`);
     }
