@@ -3,10 +3,11 @@ const state = {
   chapIdx: 0,
   notes: null,
   exams: [],
+  kmap: [],
   mastered: new Set(JSON.parse(localStorage.getItem("fp_mastered_v1") || "[]")),
   filters: { q: "", exam: "all", era: "all", subj: "all", chap: "all", coreOnly: false },
-  kmFilter: { q: "", status: "all" },
-  kmZoom: 0.78,
+  kmFilter: { q: "", status: "all", exam: 0 },
+  kmZoom: 0.72,
   kmPan: { x: 10, y: 10 },
   kmHighlight: null, // { key, prereqKeys: Set, succKeys: Set }
   page: 1,
@@ -142,36 +143,34 @@ function updateBreadcrumb() {
 
 function getAllKnowledgeNodes() {
   const list = [];
-  if (!state.notes) return list;
-  for (const subj of state.notes.subjects) {
-    subj.chapters.forEach((ch, ci) => {
-      ch.knowledge.forEach((k, ki) => {
-        list.push({
-          key: `k:${subj.key}:${ch.name}:${ki}`,
-          subjKey: subj.key,
-          chapIdx: ci,
-          kIdx: ki,
-          chName: ch.name,
-          k,
-          ch,
-        });
-      });
-    });
+  for (const subj of state.kmap || []) {
+    for (const ch of subj.chapters) {
+      for (const n of ch.nodes) {
+        list.push({ key: `km:${n.id}`, subjKey: subj.key, ch, n });
+      }
+    }
   }
   return list;
 }
 
 function renderKnowledgeMap() {
   const allNodes = getAllKnowledgeNodes();
-  const masteredNodes = allNodes.filter((n) => state.mastered.has(n.key)).length;
+  const masteredNodes = allNodes.filter((x) => state.mastered.has(x.key)).length;
   const kw = state.kmFilter.q.trim().toLowerCase();
   const st = state.kmFilter.status;
+  const ex = state.kmFilter.exam;
   const hl = state.kmHighlight;
 
   return `
     <div class="km-toolbar">
       <div class="km-controls">
-        <input id="kmSearchInput" placeholder="搜索知识点标题或公式..." value="${escHtml(state.kmFilter.q)}" oninput="onKmSearch(this.value)" style="border:1px solid var(--border);background:var(--surface-subtle);color:var(--text);border-radius:6px;padding:5px 10px;font-size:13px;min-width:200px;" />
+        <input id="kmSearchInput" placeholder="搜索 387 个考点标题或编号(C01.01)..." value="${escHtml(state.kmFilter.q)}" oninput="onKmSearch(this.value)" style="border:1px solid var(--border);background:var(--surface-subtle);color:var(--text);border-radius:6px;padding:5px 10px;font-size:13px;min-width:210px;" />
+        <select onchange="onKmExam(Number(this.value))" style="border:1px solid var(--border);background:var(--surface-subtle);color:var(--text);border-radius:6px;padding:5px 8px;font-size:13px;">
+          <option value="0" ${ex===0?"selected":""}>全部考种</option>
+          <option value="1" ${ex===1?"selected":""}>数学一</option>
+          <option value="2" ${ex===2?"selected":""}>数学二</option>
+          <option value="3" ${ex===3?"selected":""}>数学三</option>
+        </select>
         <select onchange="onKmStatus(this.value)" style="border:1px solid var(--border);background:var(--surface-subtle);color:var(--text);border-radius:6px;padding:5px 8px;font-size:13px;">
           <option value="all" ${st==="all"?"selected":""}>全部节点 (${allNodes.length})</option>
           <option value="unmastered" ${st==="unmastered"?"selected":""}>未掌握 (${allNodes.length - masteredNodes})</option>
@@ -187,58 +186,63 @@ function renderKnowledgeMap() {
           <span><i class="lg-dot prereq"></i>前置</span>
           <span><i class="lg-dot succ"></i>后续</span>
         </div>
-        <button class="maki-btn" onclick="zoomKm(-0.12)">-</button>
+        <button class="maki-btn" onclick="zoomKm(-0.1)">-</button>
         <span style="font-size:12px;color:var(--muted);min-width:38px;text-align:center;">${Math.round(state.kmZoom * 100)}%</span>
-        <button class="maki-btn" onclick="zoomKm(0.12)">+</button>
+        <button class="maki-btn" onclick="zoomKm(0.1)">+</button>
         <button class="maki-btn" onclick="resetKmView()">全览</button>
       </div>
     </div>
 
     <div class="km-viewport" id="kmViewport">
       <div class="km-canvas" id="kmCanvas" style="transform: translate(${state.kmPan.x}px, ${state.kmPan.y}px) scale(${state.kmZoom});">
-        ${state.notes.subjects.map((subj) => `
-          <div class="km-partition">
-            <div class="km-part-head">
-              <span>${escHtml(subj.key)} · 分区</span>
-              <span class="stat-lbl">${subj.chapters.length} 个子分区</span>
-            </div>
-            <div class="km-subgrid">
-              ${subj.chapters.map((ch, ci) => {
-                const chapCount = state.exams.filter((r) => r.subj === subj.key && r.ch === ch.name).length;
-                const nodes = ch.knowledge.map((k, ki) => ({ k, ki, key: `k:${subj.key}:${ch.name}:${ki}` })).filter(({ k, key }) => {
-                  const isM = state.mastered.has(key);
-                  if (st === "mastered" && !isM) return false;
-                  if (st === "unmastered" && isM) return false;
-                  if (kw && !(k.title + " " + k.content + " " + ch.name).toLowerCase().includes(kw)) return false;
-                  return true;
-                });
-                if (nodes.length === 0) return "";
-                return `
-                  <div class="km-subpart">
-                    <div class="km-sub-head">
-                      <span>${escHtml(ch.name)}</span>
-                      <span>${chapCount} 题</span>
+        ${state.kmap.map((subj) => {
+          const subjTotal = subj.chapters.reduce((acc, c) => acc + c.nodes.length, 0);
+          return `
+            <div class="km-partition">
+              <div class="km-part-head">
+                <span>${escHtml(subj.key)} · 分区</span>
+                <span class="stat-lbl">${subj.chapters.length} 章 · ${subjTotal} 个知识点</span>
+              </div>
+              <div class="km-subgrid">
+                ${subj.chapters.map((ch) => {
+                  const nodes = ch.nodes.filter((n) => {
+                    const key = `km:${n.id}`;
+                    const isM = state.mastered.has(key);
+                    if (ex && !(n.ex || []).includes(ex)) return false;
+                    if (st === "mastered" && !isM) return false;
+                    if (st === "unmastered" && isM) return false;
+                    if (kw && !(n.id + " " + n.name + " " + n.kw + " " + ch.name).toLowerCase().includes(kw)) return false;
+                    return true;
+                  });
+                  if (nodes.length === 0) return "";
+                  return `
+                    <div class="km-subpart">
+                      <div class="km-sub-head">
+                        <span>${escHtml(ch.id)} ${escHtml(ch.name)}</span>
+                        <span>${nodes.length} 考点</span>
+                      </div>
+                      <div class="km-nodes">
+                        ${nodes.map((n) => {
+                          const key = `km:${n.id}`;
+                          const isM = state.mastered.has(key);
+                          let cls = isM ? "mastered" : "";
+                          if (hl && hl.prereqKeys.has(key)) cls += " prereq";
+                          if (hl && hl.succKeys.has(key)) cls += " succ";
+                          return `
+                            <button class="km-node ${cls}" onclick="openAtomKnowledgeModal('${subj.key}', '${ch.id}', '${n.id}')">
+                              <div>${escHtml(n.name)}</div>
+                              <div class="km-node-meta">${escHtml(n.id)} · ${n.qc ? n.qc + " 真题" : (n.kw || "核心概念")}</div>
+                            </button>
+                          `;
+                        }).join("")}
+                      </div>
                     </div>
-                    <div class="km-nodes">
-                      ${nodes.map(({ k, ki, key }) => {
-                        const isM = state.mastered.has(key);
-                        let cls = isM ? "mastered" : "";
-                        if (hl && hl.prereqKeys.has(key)) cls += " prereq";
-                        if (hl && hl.succKeys.has(key)) cls += " succ";
-                        return `
-                          <button class="km-node ${cls}" onclick="openKnowledgeModal('${subj.key}', ${ci}, ${ki})">
-                            <div>${escHtml(k.title)}</div>
-                            <div class="km-node-meta">${isM ? "✓ 已掌握" : "点击学习"} · ${ch.cases.length} 例精讲</div>
-                          </button>
-                        `;
-                      }).join("")}
-                    </div>
-                  </div>
-                `;
-              }).join("")}
+                  `;
+                }).join("")}
+              </div>
             </div>
-          </div>
-        `).join("")}
+          `;
+        }).join("")}
       </div>
     </div>
   `;
@@ -543,7 +547,105 @@ window.openSubGroupModal = (subIdx, idx) => {
   renderModal();
 };
 
-window.openKnowledgeModal = (subjKey, chapIdx, kIdx) => {
+window.openAtomKnowledgeModal = (subjKey, chapId, nodeId) => {
+  const subjTree = state.kmap.find((t) => t.key === subjKey);
+  const kCh = subjTree && subjTree.chapters.find((c) => c.id === chapId);
+  const node = kCh && kCh.nodes.find((n) => n.id === nodeId);
+  if (!node) return;
+
+  const noteSubj = state.notes.subjects.find((s) => s.key === subjKey);
+  const noteChapIdx = noteSubj ? noteSubj.chapters.findIndex((c) => c.name === kCh.noteChap) : -1;
+  const noteCh = noteChapIdx >= 0 ? noteSubj.chapters[noteChapIdx] : null;
+
+  const mKey = `km:${node.id}`;
+  const done = state.mastered.has(mKey);
+  const examTags = (node.ex || []).map((e) => `数${["一","二","三"][e-1]}`).join(" / ");
+
+  // Collect matched real-exam questions (or fallback by keyword in this subject)
+  let matched = (node.qids || []).map((id) => state.exams.find((r) => r.id === id)).filter(Boolean);
+  if (matched.length === 0 && node.kw) {
+    const kw = node.kw.toLowerCase();
+    matched = state.exams.filter((r) => r.subj === subjKey && (r.q + " " + r.sub).toLowerCase().includes(kw)).slice(0, 15);
+  }
+  window._atomModalList = matched;
+
+  state.modalIndex = -1;
+  document.getElementById("mTitle").textContent = `${node.id} · ${node.name}`;
+  document.getElementById("mStars").textContent = examTags;
+  document.getElementById("mFootInfo").textContent = `关联真题 ${matched.length} 题`;
+  document.getElementById("mPrevBtn").disabled = true;
+  document.getElementById("mNextBtn").disabled = true;
+
+  const body = document.getElementById("mBody");
+  body.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+      <div>
+        <span class="pill-badge">${escHtml(subjKey)} / ${escHtml(kCh.name)}</span>
+        <span class="pill-badge purple">${done ? "已掌握" : "未掌握 · 保存在本浏览器"}</span>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="maki-btn" onclick="highlightAtomRelations('${subjKey}', '${chapId}', '${nodeId}')">查看引用关系</button>
+        <button class="maki-btn ${done ? "done" : ""}" onclick="toggleMastered('${mKey}'); openAtomKnowledgeModal('${subjKey}', '${chapId}', '${nodeId}');">${done ? "✓ 已掌握" : "标记为已掌握"}</button>
+        ${noteChapIdx >= 0 ? `<button class="maki-btn" onclick="enterChapterLecture('${subjKey}', ${noteChapIdx})">进入本章讲义 →</button>` : ""}
+      </div>
+    </div>
+
+    ${noteCh ? noteCh.knowledge.map((k) => `
+      <div class="callout blue">
+        <div class="callout-head"><span class="callout-tag">章节核心 · ${escHtml(k.title)}</span></div>
+        <div class="chain-line">前置 → 后续：${escHtml(k.chain)}</div>
+        <div>${renderMathMarkdown(k.content)}</div>
+      </div>
+    `).join("") : ""}
+
+    ${noteCh ? `
+      <div class="callout orange">
+        <div class="callout-head"><span class="callout-tag">提醒 / 易错边界</span></div>
+        <ul style="margin:0;padding-left:18px;">${noteCh.pitfalls.map((p) => `<li>${renderMathMarkdown(p)}</li>`).join("")}</ul>
+      </div>
+    ` : ""}
+
+    <div style="font-weight:700;margin:12px 0 8px;">🎯 关联真题演练（${matched.length} 题 · 点击进入完整解析与最优解）</div>
+    <div class="q-list">
+      ${matched.length ? matched.map((r, idx) => `
+        <div class="q-row" onclick="openAtomExamModal(${idx})">
+          <span class="q-doc-icon">📄</span>
+          <span class="q-row-id">#${r.id}</span>
+          <span class="q-row-src">${escHtml(r.s)}</span>
+          <span class="q-row-preview">${escHtml(r.q.replace(/\s+/g, " ").slice(0, 75))}</span>
+          <span class="q-row-diff">${r.c ? "★ 严选" : escHtml(r.ch)}</span>
+        </div>
+      `).join("") : `<div style="padding:14px;color:var(--muted);font-size:13px;">本考点暂无直接绑定真题，可点击「进入本章讲义」查看本章全部真题。</div>`}
+    </div>
+  `;
+  document.getElementById("qModalBackdrop").classList.remove("hidden");
+};
+
+window.openAtomExamModal = (idx) => {
+  state.modalList = (window._atomModalList || []).map((r) => ({ raw: r, caseNote: null }));
+  state.modalIndex = idx;
+  renderModal();
+};
+
+window.highlightAtomRelations = (subjKey, chapId, nodeId) => {
+  const subjTree = state.kmap.find((t) => t.key === subjKey);
+  const cIdx = subjTree.chapters.findIndex((c) => c.id === chapId);
+  const ch = subjTree.chapters[cIdx];
+  const nIdx = ch.nodes.findIndex((n) => n.id === nodeId);
+  const prereqKeys = new Set();
+  const succKeys = new Set();
+  ch.nodes.forEach((n, i) => {
+    if (i < nIdx) prereqKeys.add(`km:${n.id}`);
+    else if (i > nIdx) succKeys.add(`km:${n.id}`);
+  });
+  if (cIdx > 0) subjTree.chapters[cIdx - 1].nodes.forEach((n) => prereqKeys.add(`km:${n.id}`));
+  if (cIdx + 1 < subjTree.chapters.length) subjTree.chapters[cIdx + 1].nodes.forEach((n) => succKeys.add(`km:${n.id}`));
+  state.kmHighlight = { key: `km:${nodeId}`, prereqKeys, succKeys };
+  document.getElementById("qModalBackdrop").classList.add("hidden");
+  render();
+};
+
+window.onKmExam = (v) => { state.kmFilter.exam = v; render(); };
   const subj = state.notes.subjects.find((s) => s.key === subjKey);
   const ch = subj.chapters[chapIdx];
   const k = ch.knowledge[kIdx];
@@ -733,17 +835,20 @@ document.getElementById("themeToggle").addEventListener("click", () => {
 if (localStorage.getItem("fp_theme") === "dark") document.documentElement.classList.add("dark");
 saveMastered();
 
-if (window.__FP_NOTES__ && window.__FP_EXAMS__) {
+if (window.__FP_NOTES__ && window.__FP_EXAMS__ && window.__FP_KMAP__) {
   state.notes = window.__FP_NOTES__;
   state.exams = window.__FP_EXAMS__;
+  state.kmap = window.__FP_KMAP__;
   render();
 } else {
   Promise.all([
     fetch("./data/review_notes.json").then((r) => r.json()),
     fetch("./data/real_exams.json").then((r) => r.json()),
-  ]).then(([notes, exams]) => {
+    fetch("./data/knowledge_map.json").then((r) => r.json()),
+  ]).then(([notes, exams, kmap]) => {
     state.notes = notes;
     state.exams = exams;
+    state.kmap = kmap;
     render();
   }).catch((err) => {
     document.getElementById("appRoot").innerHTML = `<div class="loading-box">数据加载失败：${escHtml(err.message)}</div>`;
