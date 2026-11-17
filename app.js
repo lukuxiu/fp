@@ -395,13 +395,19 @@ document.getElementById("themeToggle").addEventListener("click", () => {
 if (localStorage.getItem("fp_theme") === "dark") document.documentElement.classList.add("dark");
 saveMastered();
 
-Promise.all([
-  fetch("./data/review_notes.json").then((r) => r.json()),
-  fetch("./data/real_exams.json").then((r) => r.json()),
-]).then(([notes, exams]) => {
-  state.notes = notes;
-  state.exams = exams;
+if (window.__FP_NOTES__ && window.__FP_EXAMS__) {
+  state.notes = window.__FP_NOTES__;
+  state.exams = window.__FP_EXAMS__;
   render();
-}).catch((err) => {
-  document.getElementById("appRoot").innerHTML = `<div class="loading-box">数据加载失败：${escHtml(err.message)}</div>`;
-});
+} else {
+  Promise.all([
+    fetch("./data/review_notes.json").then((r) => r.json()),
+    fetch("./data/real_exams.json").then((r) => r.json()),
+  ]).then(([notes, exams]) => {
+    state.notes = notes;
+    state.exams = exams;
+    render();
+  }).catch((err) => {
+    document.getElementById("appRoot").innerHTML = `<div class="loading-box">数据加载失败：${escHtml(err.message)}</div>`;
+  });
+}
