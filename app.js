@@ -31,18 +31,77 @@ function escHtml(str) {
     .replace(/>/g, "&gt;");
 }
 
+function renderMathMarkdown(content, questionId) {
+  if (!content) return "";
+  let str = String(content);
+
+  // 1. Render block math $$...$$ and \[...\] first
+  const blocks = [];
+  str = str.replace(/\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\]/g, (full, m1, m2) => {
+    const math = (m1 !== undefined ? m1 : m2).trim();
+    try {
+      const rendered = typeof katex !== "undefined"
+        ? katex.renderToString(math, { displayMode: true, throwOnError: false })
+        : `$$${math}$$`;
+      const idx = blocks.length;
+      blocks.push(rendered);
+      return `@@BLOCK_${idx}@@`;
+    } catch {
+      return full;
+    }
+  });
+
+  // 2. Render inline math $...$ and \(...\)
+  const inlines = [];
+  str = str.replace(/\$([^\$\n]+?)\$|\\\(([\s\S]*?)\\\)/g, (full, m1, m2) => {
+    const math = (m1 !== undefined ? m1 : m2).trim();
+    try {
+      const rendered = typeof katex !== "undefined"
+        ? katex.renderToString(math, { displayMode: false, throwOnError: false })
+        : `$${math}$`;
+      const idx = inlines.length;
+      inlines.push(rendered);
+      return `@@INLINE_${idx}@@`;
+    } catch {
+      return full;
+    }
+  });
+
+  // 3. Handle Markdown images ![alt](url) including asset://sha256/...
+  const images = [];
+  str = str.replace(/!\[(.*?)\]\((.*?)\)/g, (_, alt, url) => {
+    let cleanUrl = url.trim();
+    const idx = images.length;
+    const safeAlt = (alt || "题图").replace(/"/g, "&quot;");
+    const shaMatch = cleanUrl.match(/^asset:\/\/sha256\/([0-9a-f]{64})$/i);
+    if (shaMatch && questionId) {
+      cleanUrl = `https://cxyonly.fans/api/v1/questions/${questionId}/assets/${shaMatch[1]}`;
+    }
+    if (/^(https?:\/\/|\.\/|\/)/.test(cleanUrl)) {
+      images.push(`<img src="${cleanUrl}" alt="${safeAlt}" referrerpolicy="no-referrer" loading="lazy" style="max-width:100%;max-height:320px;border-radius:8px;border:1px solid var(--border);background:#fff;padding:4px;margin:6px 0;display:block;" />`);
+    } else {
+      images.push(`<span class="pill-badge">🖼️ ${escHtml(safeAlt)}</span>`);
+    }
+    return `@@IMAGE_${idx}@@`;
+  });
+
+  // 4. Escape remaining HTML safely and convert basic Markdown
+  str = escHtml(str);
+  str = str.replace(/^### (.*?)$/gm, '<div style="font-weight:700;margin:10px 0 4px;color:var(--blue);">$1</div>');
+  str = str.replace(/^#### (.*?)$/gm, '<div style="font-weight:600;margin:8px 0 4px;">$1</div>');
+  str = str.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+  str = str.replace(/\n\n/g, '<div style="height:8px;"></div>');
+  str = str.replace(/\n/g, "<br/>");
+
+  // 5. Restore placeholders
+  str = str.replace(/@@BLOCK_(\d+)@@/g, (_, idx) => `<div class="katex-display">${blocks[Number(idx)]}</div>`);
+  str = str.replace(/@@INLINE_(\d+)@@/g, (_, idx) => inlines[Number(idx)]);
+  str = str.replace(/@@IMAGE_(\d+)@@/g, (_, idx) => images[Number(idx)]);
+  return str;
+}
+
 function renderMathInEl(el) {
-  if (typeof renderMathInElement === "function" && el) {
-    renderMathInElement(el, {
-      delimiters: [
-        { left: "$$", right: "$$", display: true },
-        { left: "$", right: "$", display: false },
-        { left: "\\(", right: "\\)", display: false },
-        { left: "\\[", right: "\\]", display: true },
-      ],
-      throwOnError: false,
-    });
-  }
+  // Handled inline via renderMathMarkdown; keep as no-op for compatibility
 }
 
 function updateRail() {
@@ -279,29 +338,29 @@ function renderModal() {
       <button class="maki-btn ${done ? "done" : ""}" onclick="toggleMastered('${mKey}')">${done ? "✓ 已掌握" : "标记已掌握"}</button>
     </div>
 
-    <div style="font-size:15px;margin:10px 0;overflow-x:auto;">${escHtml(raw.q)}</div>
-    ${raw.o && raw.o.length ? `<div class="q-opts">${raw.o.map((o) => `<div class="q-opt">${escHtml(o)}</div>`).join("")}</div>` : ""}
+    <div style="font-size:15px;margin:10px 0;overflow-x:auto;">${renderMathMarkdown(raw.q, raw.id)}</div>
+    ${raw.o && raw.o.length ? `<div class="q-opts">${raw.o.map((o) => `<div class="q-opt">${renderMathMarkdown(o, raw.id)}</div>`).join("")}</div>` : ""}
 
     ${caseNote ? `
       <div class="acc-item">
         <div class="acc-head"><span class="dot purple"></span> 考点与命题核心</div>
-        <div class="acc-body">${escHtml(caseNote.title)}</div>
+        <div class="acc-body">${renderMathMarkdown(caseNote.title, raw.id)}</div>
       </div>
       <div class="acc-item">
         <div class="acc-head"><span class="dot blue"></span> 最优解与详解</div>
-        <div class="acc-body">${escHtml(caseNote.optimal)}</div>
+        <div class="acc-body">${renderMathMarkdown(caseNote.optimal, raw.id)}</div>
       </div>
       <div class="acc-item">
         <div class="acc-head"><span class="dot teal"></span> 结论与同类题手法共通</div>
-        <div class="acc-body">${escHtml(caseNote.common)}</div>
+        <div class="acc-body">${renderMathMarkdown(caseNote.common, raw.id)}</div>
       </div>
     ` : ""}
 
     <div class="acc-item">
       <div class="acc-head"><span class="dot orange"></span> 原题答案与完整解析</div>
       <div class="acc-body">
-        <div><strong>答案：</strong>${escHtml(raw.a)}</div>
-        <div style="margin-top:8px;">${escHtml(raw.x).replace(/\n/g, "<br/>")}</div>
+        <div><strong>答案：</strong>${renderMathMarkdown(raw.a, raw.id)}</div>
+        <div style="margin-top:8px;">${renderMathMarkdown(raw.x, raw.id)}</div>
       </div>
     </div>
   `;
