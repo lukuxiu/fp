@@ -185,13 +185,24 @@ function renderSubjectLecture(subjKey) {
   if (!subj) return "";
   const ch = subj.chapters[Math.min(state.chapIdx, subj.chapters.length - 1)];
 
+  // Group all real exam questions in this chapter by subtopic (r.sub)
+  const chapExams = state.exams.filter((r) => r.subj === subjKey && r.ch === ch.name);
+  const bySub = new Map();
+  for (const r of chapExams) {
+    const key = r.sub || ch.name;
+    if (!bySub.has(key)) bySub.set(key, []);
+    bySub.get(key).push(r);
+  }
+  const subEntries = [...bySub.entries()].sort((a, b) => b[1].length - a[1].length);
+  window._chapSubList = subEntries.map((e) => e[1]);
+
   return `
     <div class="maki-panel" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
       <div>
         <h2 style="margin:0;font-size:18px;">${escHtml(ch.name)}</h2>
-        <div class="stat-lbl">${escHtml(ch.badge)}</div>
+        <div class="stat-lbl">${escHtml(ch.badge)} · 本章共 ${chapExams.length} 道真题</div>
       </div>
-      <button class="maki-btn" onclick="jumpBank({subj:'${subjKey}'})">在题库中查看全部 ${subjKey} →</button>
+      <button class="maki-btn" onclick="jumpBank({subj:'${subjKey}', chap:'${escHtml(ch.name)}'})">在题库中筛选本章 (${chapExams.length}题) →</button>
     </div>
 
     ${ch.knowledge.map((k, ki) => {
@@ -215,7 +226,7 @@ function renderSubjectLecture(subjKey) {
     </div>
 
     <div class="maki-panel">
-      <div style="font-weight:700;margin-bottom:10px;">🎯 对应真题演练（点击行打开 Maki 详情弹窗，支持上一题 / 下一题）</div>
+      <div style="font-weight:700;margin-bottom:10px;">🎯 典型真题详解、最优解替换与手法共通（点击打开弹窗）</div>
       <div class="q-list">
         ${ch.cases.map((c, idx) => {
           const rawQ = state.exams.find((x) => x.id === c.id);
@@ -230,6 +241,30 @@ function renderSubjectLecture(subjKey) {
           `;
         }).join("")}
       </div>
+    </div>
+
+    <div class="maki-panel">
+      <div style="font-weight:700;margin-bottom:10px;">📚 本章全量真题按细分考点分类（1987–2026 共 ${chapExams.length} 题 · 点击任意题目复盘）</div>
+      ${subEntries.map(([subName, items], subIdx) => `
+        <details class="acc-item" ${subEntries.length <= 4 ? "open" : ""}>
+          <summary class="acc-head" style="list-style:none;">
+            <span class="dot teal"></span>
+            <span style="flex:1">${escHtml(subName)}</span>
+            <span class="pill-badge" style="margin:0">${items.length} 题</span>
+          </summary>
+          <div class="q-list" style="border:none;border-top:1px solid var(--border);border-radius:0;">
+            ${items.map((r, idx) => `
+              <div class="q-row" onclick="openSubGroupModal(${subIdx}, ${idx})">
+                <span class="q-doc-icon">📄</span>
+                <span class="q-row-id">#${r.id}</span>
+                <span class="q-row-src">${escHtml(r.s)}</span>
+                <span class="q-row-preview">${escHtml(r.q.replace(/\s+/g, " ").slice(0, 80))}</span>
+                <span class="q-row-diff">${r.c ? "★ 严选" : (state.mastered.has("q:" + r.id) ? "✓" : "")}</span>
+              </div>
+            `).join("")}
+          </div>
+        </details>
+      `).join("")}
     </div>
   `;
 }
@@ -388,6 +423,13 @@ window.openCaseModal = (subjKey, chapIdx, caseIdx) => {
 
 window.openBankModal = (idx) => {
   state.modalList = (window._lastBankList || []).map((r) => ({ raw: r, caseNote: null }));
+  state.modalIndex = idx;
+  renderModal();
+};
+
+window.openSubGroupModal = (subIdx, idx) => {
+  const items = (window._chapSubList && window._chapSubList[subIdx]) || [];
+  state.modalList = items.map((r) => ({ raw: r, caseNote: null }));
   state.modalIndex = idx;
   renderModal();
 };
