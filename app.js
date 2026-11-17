@@ -646,60 +646,6 @@ window.highlightAtomRelations = (subjKey, chapId, nodeId) => {
 };
 
 window.onKmExam = (v) => { state.kmFilter.exam = v; render(); };
-  const subj = state.notes.subjects.find((s) => s.key === subjKey);
-  const ch = subj.chapters[chapIdx];
-  const k = ch.knowledge[kIdx];
-  const mKey = `k:${subjKey}:${ch.name}:${kIdx}`;
-  const done = state.mastered.has(mKey);
-  const chapExams = state.exams.filter((r) => r.subj === subjKey && r.ch === ch.name);
-
-  state.modalIndex = -1;
-  document.getElementById("mTitle").textContent = `${k.title}`;
-  document.getElementById("mStars").textContent = `${subjKey} · ${ch.name}`;
-  document.getElementById("mFootInfo").textContent = `本章共 ${chapExams.length} 道真题`;
-  document.getElementById("mPrevBtn").disabled = true;
-  document.getElementById("mNextBtn").disabled = true;
-
-  const body = document.getElementById("mBody");
-  body.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
-      <div>
-        <span class="pill-badge">${escHtml(subjKey)} / ${escHtml(ch.name)}</span>
-        <span class="pill-badge purple">${done ? "已掌握" : "未掌握 · 保存在本浏览器"}</span>
-      </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;">
-        <button class="maki-btn" onclick="highlightRelations('${subjKey}', ${chapIdx}, ${kIdx})">查看引用关系</button>
-        <button class="maki-btn ${done ? "done" : ""}" onclick="toggleMastered('${mKey}'); openKnowledgeModal('${subjKey}', ${chapIdx}, ${kIdx});">${done ? "✓ 已掌握" : "标记为已掌握"}</button>
-        <button class="maki-btn" onclick="enterChapterLecture('${subjKey}', ${chapIdx})">进入本章讲义 →</button>
-      </div>
-    </div>
-
-    <div class="callout blue">
-      <div class="callout-head"><span class="callout-tag">定理 / 公式 · ${escHtml(k.title)}</span></div>
-      <div class="chain-line">直接前置 / 后续：${escHtml(k.chain)}</div>
-      <div>${renderMathMarkdown(k.content)}</div>
-    </div>
-
-    <div class="callout orange">
-      <div class="callout-head"><span class="callout-tag">提醒 / 易错边界</span></div>
-      <ul style="margin:0;padding-left:18px;">${ch.pitfalls.map((p) => `<li>${renderMathMarkdown(p)}</li>`).join("")}</ul>
-    </div>
-
-    <div style="font-weight:700;margin:12px 0 8px;">🎯 对应真题演练（点击题目进入详解与最优解）</div>
-    <div class="q-list">
-      ${ch.cases.map((c, idx) => `
-        <div class="q-row" onclick="openCaseModal('${subjKey}', ${chapIdx}, ${idx})">
-          <span class="q-doc-icon">📄</span>
-          <span class="q-row-id">#${c.id}</span>
-          <span class="q-row-src">${escHtml(c.src)}</span>
-          <span class="q-row-preview">${escHtml(c.title)}</span>
-          <span class="q-row-diff">难度 ${c.stars} / 5</span>
-        </div>
-      `).join("")}
-    </div>
-  `;
-  document.getElementById("qModalBackdrop").classList.remove("hidden");
-};
 
 window.highlightRelations = (subjKey, chapIdx, kIdx) => {
   const subj = state.notes.subjects.find((s) => s.key === subjKey);
