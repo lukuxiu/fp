@@ -35,8 +35,8 @@ function renderMathMarkdown(content, questionId) {
   if (!content) return "";
   let str = String(content);
 
-  // 0. Promote multiline single-$ blocks containing \begin{...} to $$...$$
-  str = str.replace(/(?<!\$)\$(?!\$)([\s\S]*?\\begin\{[\s\S]*?\\end\{[^}]+\}[\s\S]*?)(?<!\$)\$(?!\$)/g, (_, inner) => `$$${inner}$$`);
+  // 0. Promote multiline single-$ blocks containing \begin{...} (without crossing other $) to $$...$$
+  str = str.replace(/(?<!\$)\$(?!\$)([^\$]*?\\begin\{[^}]+\}[\s\S]*?\\end\{[^}]+\}[^\$]*?)(?<!\$)\$(?!\$)/g, (_, inner) => `$$${inner}$$`);
 
   // 1. Render block math $$...$$ and \[...\] first
   const blocks = [];
@@ -44,7 +44,7 @@ function renderMathMarkdown(content, questionId) {
     const math = (m1 !== undefined ? m1 : m2).trim();
     try {
       const rendered = typeof katex !== "undefined"
-        ? katex.renderToString(math, { displayMode: true, throwOnError: false })
+        ? katex.renderToString(math, { displayMode: true, throwOnError: false, strict: false })
         : `$$${math}$$`;
       const idx = blocks.length;
       blocks.push(rendered);
@@ -60,7 +60,7 @@ function renderMathMarkdown(content, questionId) {
     const math = (m1 !== undefined ? m1 : m2).trim();
     try {
       const rendered = typeof katex !== "undefined"
-        ? katex.renderToString(math, { displayMode: false, throwOnError: false })
+        ? katex.renderToString(math, { displayMode: false, throwOnError: false, strict: false })
         : `$${math}$`;
       const idx = inlines.length;
       inlines.push(rendered);
@@ -204,14 +204,14 @@ function renderSubjectLecture(subjKey) {
             <button class="maki-btn ${done ? "done" : ""}" onclick="toggleMastered('${mKey}')">${done ? "✓ 已掌握" : "标记此知识点为已掌握"}</button>
           </div>
           <div class="chain-line">前置 → 后续：${escHtml(k.chain)}</div>
-          <div>${escHtml(k.content)}</div>
+          <div>${renderMathMarkdown(k.content)}</div>
         </div>
       `;
     }).join("")}
 
     <div class="callout orange">
       <div class="callout-head"><span class="callout-tag">提醒 / 易错边界</span></div>
-      <ul style="margin:0;padding-left:18px;">${ch.pitfalls.map((p) => `<li>${escHtml(p)}</li>`).join("")}</ul>
+      <ul style="margin:0;padding-left:18px;">${ch.pitfalls.map((p) => `<li>${renderMathMarkdown(p)}</li>`).join("")}</ul>
     </div>
 
     <div class="maki-panel">
@@ -342,7 +342,11 @@ function renderModal() {
     </div>
 
     <div style="font-size:15px;margin:10px 0;overflow-x:auto;">${renderMathMarkdown(raw.q, raw.id)}</div>
-    ${raw.o && raw.o.length ? `<div class="q-opts">${raw.o.map((o) => `<div class="q-opt">${renderMathMarkdown(o, raw.id)}</div>`).join("")}</div>` : ""}
+    ${raw.o && raw.o.length ? `<div class="q-opts">${raw.o.map((o) => {
+      const lbl = typeof o === "object" && o !== null ? o.label : "";
+      const txt = typeof o === "object" && o !== null ? o.text : o;
+      return `<div class="q-opt">${lbl ? `<strong>${escHtml(lbl)}.</strong> ` : ""}${renderMathMarkdown(txt, raw.id)}</div>`;
+    }).join("")}</div>` : ""}
 
     ${caseNote ? `
       <div class="acc-item">
