@@ -2,6 +2,7 @@ const state = {
   tab: "高等数学",
   chapIdx: 0,
   globalExam: "all",
+  globalEra: "recent",
   notes: null,
   exams: [],
   kmap: [],
@@ -307,7 +308,9 @@ function renderOverview() {
 
 function renderDeepChapter(deep) {
   const exFilter = state.globalExam;
-  const allCount = deep.families.reduce((acc, fam) => acc + fam.questions.filter((q) => exFilter === "all" || q.exams.includes(exFilter)).length, 0);
+  const eraFilter = state.globalEra;
+  const matchQ = (q) => (exFilter === "all" || q.exams.includes(exFilter)) && (eraFilter === "all" || q.era === eraFilter);
+  const allCount = deep.families.reduce((acc, fam) => acc + fam.questions.filter(matchQ).length, 0);
 
   return `
     <div class="maki-panel" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
@@ -315,20 +318,20 @@ function renderDeepChapter(deep) {
         <h2 style="margin:0;font-size:18px;">${escHtml(deep.subject)} · ${escHtml(deep.chapter)}（逐题精讲讲义）</h2>
         <div class="stat-lbl">${escHtml(deep.subtitle)} · 当前筛选共 ${allCount} 道独立母题</div>
       </div>
-      <button class="maki-btn" onclick="jumpBank({subj:'${deep.subject}', chap:'${deep.chapter}', era:'recent'})">在题库中查看本章全部真题 →</button>
+      <button class="maki-btn" onclick="jumpBank({subj:'${deep.subject}', chap:'${deep.chapter}', era:'${eraFilter}'})">在题库中查看本章全部真题 →</button>
     </div>
 
     <div class="maki-panel" style="padding:10px 14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
       <span style="font-size:12.5px;font-weight:700;color:var(--muted);">📑 题型族快捷跳转：</span>
       ${deep.families.map((fam, fi) => {
-        const cnt = fam.questions.filter((q) => exFilter === "all" || q.exams.includes(exFilter)).length;
+        const cnt = fam.questions.filter(matchQ).length;
         if (cnt === 0) return "";
         return `<button class="maki-btn" onclick="scrollToFamily(${fi})">${escHtml(fam.name.split("（")[0])} (${cnt})</button>`;
       }).join("")}
     </div>
 
     ${deep.families.map((fam, fi) => {
-      const qs = fam.questions.filter((q) => exFilter === "all" || q.exams.includes(exFilter));
+      const qs = fam.questions.filter(matchQ);
       if (qs.length === 0) return "";
       const mKey = `fam:${deep.chapter}:${fi}`;
       const done = state.mastered.has(mKey);
@@ -866,6 +869,16 @@ window.jumpBank = (opts) => {
   setTimeout(() => { const inp = document.getElementById("searchInput"); if (inp) inp.focus(); }, 30);
 };
 
+document.getElementById("eraPills").addEventListener("click", (e) => {
+  const btn = e.target.closest(".exam-pill");
+  if (!btn) return;
+  const era = btn.dataset.era;
+  state.globalEra = era;
+  state.filters.era = era;
+  document.querySelectorAll("#eraPills .exam-pill").forEach((b) => b.classList.toggle("active", b === btn));
+  render();
+});
+
 document.getElementById("examPills").addEventListener("click", (e) => {
   const btn = e.target.closest(".exam-pill");
   if (!btn) return;
@@ -873,7 +886,7 @@ document.getElementById("examPills").addEventListener("click", (e) => {
   state.globalExam = ex;
   state.filters.exam = ex;
   state.kmFilter.exam = ex === "数一" ? 1 : (ex === "数二" ? 2 : (ex === "数三" ? 3 : 0));
-  document.querySelectorAll(".exam-pill").forEach((b) => b.classList.toggle("active", b === btn));
+  document.querySelectorAll("#examPills .exam-pill").forEach((b) => b.classList.toggle("active", b === btn));
   render();
 });
 
