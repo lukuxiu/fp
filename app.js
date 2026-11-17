@@ -127,6 +127,13 @@ function updateRail() {
     <div class="rail-section-label">${escHtml(subj.key)} · 章节</div>
     ${subj.chapters.map((c, i) => `
       <button class="rail-chap-btn ${i === state.chapIdx ? "active" : ""}" onclick="selectChap(${i})">${escHtml(c.name)}</button>
+      ${i === state.chapIdx && subj.key === "高等数学" && c.name === "极限" && state.limitDeep ? `
+        <div style="padding-left:10px;margin:2px 0 6px;border-left:2px solid var(--border);">
+          ${state.limitDeep.families.map((fam, fi) => `
+            <button class="rail-chap-btn" style="font-size:11.5px;padding:4px 8px;color:var(--muted);" onclick="scrollToFamily(${fi})">${escHtml(fam.name.split("（")[0])}</button>
+          `).join("")}
+        </div>
+      ` : ""}
     `).join("")}
   `;
 }
@@ -308,13 +315,22 @@ function renderDeepChapter(deep) {
       <button class="maki-btn" onclick="jumpBank({subj:'${deep.subject}', chap:'${deep.chapter}', era:'recent'})">在题库中查看本章全部真题 →</button>
     </div>
 
+    <div class="maki-panel" style="padding:10px 14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <span style="font-size:12.5px;font-weight:700;color:var(--muted);">📑 题型族快捷跳转：</span>
+      ${deep.families.map((fam, fi) => {
+        const cnt = fam.questions.filter((q) => exFilter === "all" || q.exams.includes(exFilter)).length;
+        if (cnt === 0) return "";
+        return `<button class="maki-btn" onclick="scrollToFamily(${fi})">${escHtml(fam.name.split("（")[0])} (${cnt})</button>`;
+      }).join("")}
+    </div>
+
     ${deep.families.map((fam, fi) => {
       const qs = fam.questions.filter((q) => exFilter === "all" || q.exams.includes(exFilter));
       if (qs.length === 0) return "";
       const mKey = `fam:${deep.chapter}:${fi}`;
       const done = state.mastered.has(mKey);
       return `
-        <div class="maki-panel">
+        <div class="maki-panel" id="fam-${fi}" style="scroll-margin-top:68px;">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
             <h3 style="margin:0;font-size:16px;">${escHtml(fam.name)}</h3>
             <span class="pill-badge" style="margin:0;">${qs.length} 道近十年真题</span>
@@ -830,6 +846,10 @@ function render() {
 }
 
 window.selectChap = (i) => { state.chapIdx = i; render(); window.scrollTo({ top: 0, behavior: "smooth" }); };
+window.scrollToFamily = (fi) => {
+  const el = document.getElementById(`fam-${fi}`);
+  if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+};
 window.toggleMastered = toggleMastered;
 window.onFilter = (k, v) => { state.filters[k] = v; state.page = 1; render(); };
 window.onSearch = (v) => { state.filters.q = v; state.page = 1; render(); };
