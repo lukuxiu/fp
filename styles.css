@@ -294,6 +294,25 @@ html.dark .km-partition { background: rgba(17, 24, 39, 0.85); }
 .km-node.succ { background: var(--teal-bg); border-color: var(--teal); color: var(--teal); box-shadow: 0 0 0 2px rgba(13,148,136,0.18); }
 .km-node-meta { font-size: 10.5px; font-weight: 500; color: var(--muted); margin-top: 2px; }
 
+.exam-pills { display: inline-flex; background: var(--surface-subtle); border: 1px solid var(--border); border-radius: 7px; padding: 2px; gap: 2px; }
+.exam-pill {
+  border: none; background: transparent; color: var(--muted); font-size: 12px; font-weight: 600;
+  padding: 3px 9px; border-radius: 5px; cursor: pointer;
+}
+.exam-pill.active { background: var(--surface); color: var(--blue); box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+
+.deep-q-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 14px 16px; margin-bottom: 12px;
+}
+.deep-q-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.deep-grid { display: grid; gap: 8px; margin-top: 10px; font-size: 13.5px; }
+.deep-box { padding: 8px 12px; border-radius: 7px; border-left: 3px solid var(--border); background: var(--surface-subtle); }
+.deep-box.kp { border-left-color: var(--purple); background: var(--purple-bg); }
+.deep-box.opt { border-left-color: var(--blue); background: var(--blue-bg); }
+.deep-box.common { border-left-color: var(--teal); background: var(--teal-bg); }
+.deep-box.pit { border-left-color: var(--orange); background: var(--orange-bg); }
+
 @media (max-width: 860px) {
   .app-shell { flex-direction: column; }
   .rail { width: 100%; height: auto; position: static; border-right: none; border-bottom: 1px solid var(--border); }

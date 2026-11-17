@@ -16,11 +16,10 @@
       </div>
       <div class="rail-section-label">NAVIGATION</div>
       <nav class="rail-nav" id="railNav">
-        <button class="rail-item active" data-tab="knowledge">🗺️ 知识地图 (主界面)</button>
-        <button class="rail-item" data-tab="overview">📊 全局总览</button>
-        <button class="rail-item" data-tab="高等数学">∫ 高等数学讲义 (8章)</button>
+        <button class="rail-item active" data-tab="高等数学">∫ 高等数学讲义 (8章)</button>
         <button class="rail-item" data-tab="线性代数">📐 线性代数讲义 (7章)</button>
         <button class="rail-item" data-tab="概率统计">🎲 概率统计讲义 (8章)</button>
+        <button class="rail-item" data-tab="knowledge">🗺️ 知识地图 (387考点)</button>
         <button class="rail-item" data-tab="bank">📚 全部真题库 (2,872)</button>
       </nav>
       <div class="rail-chapters" id="railChapters"></div>
@@ -28,10 +27,16 @@
 
     <div class="main-col">
       <header class="maki-topbar">
-        <div class="breadcrumb" id="breadcrumb">APP / 全局总览</div>
+        <div class="breadcrumb" id="breadcrumb">APP / 复盘讲义 / 高等数学 / 极限</div>
         <div class="topbar-right">
+          <div class="exam-pills" id="examPills">
+            <button class="exam-pill active" data-exam="all">全部</button>
+            <button class="exam-pill" data-exam="数一">数一</button>
+            <button class="exam-pill" data-exam="数二">数二</button>
+            <button class="exam-pill" data-exam="数三">数三</button>
+          </div>
           <button class="kbd-search" id="quickSearchBtn" title="跳转全库搜索 (Ctrl+K)">
-            <span>🔍 搜索题号、考点或公式…</span>
+            <span>🔍 搜索</span>
             <kbd>Ctrl+K</kbd>
           </button>
           <span class="mastery-pill" id="progressPill">已掌握 0</span>

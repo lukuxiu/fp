@@ -1,9 +1,11 @@
 const state = {
-  tab: "knowledge",
+  tab: "高等数学",
   chapIdx: 0,
+  globalExam: "all",
   notes: null,
   exams: [],
   kmap: [],
+  limitDeep: null,
   mastered: new Set(JSON.parse(localStorage.getItem("fp_mastered_v1") || "[]")),
   filters: { q: "", exam: "all", era: "all", subj: "all", chap: "all", coreOnly: false },
   kmFilter: { q: "", status: "all", exam: 0 },
@@ -293,10 +295,100 @@ function renderOverview() {
   `;
 }
 
+function renderDeepChapter(deep) {
+  const exFilter = state.globalExam;
+  const allCount = deep.families.reduce((acc, fam) => acc + fam.questions.filter((q) => exFilter === "all" || q.exams.includes(exFilter)).length, 0);
+
+  return `
+    <div class="maki-panel" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+      <div>
+        <h2 style="margin:0;font-size:18px;">${escHtml(deep.subject)} · ${escHtml(deep.chapter)}（逐题精讲讲义）</h2>
+        <div class="stat-lbl">${escHtml(deep.subtitle)} · 当前筛选共 ${allCount} 道独立母题</div>
+      </div>
+      <button class="maki-btn" onclick="jumpBank({subj:'${deep.subject}', chap:'${deep.chapter}', era:'recent'})">在题库中查看本章全部真题 →</button>
+    </div>
+
+    ${deep.families.map((fam, fi) => {
+      const qs = fam.questions.filter((q) => exFilter === "all" || q.exams.includes(exFilter));
+      if (qs.length === 0) return "";
+      const mKey = `fam:${deep.chapter}:${fi}`;
+      const done = state.mastered.has(mKey);
+      return `
+        <div class="maki-panel">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+            <h3 style="margin:0;font-size:16px;">${escHtml(fam.name)}</h3>
+            <span class="pill-badge" style="margin:0;">${qs.length} 道近十年真题</span>
+          </div>
+
+          <div class="callout ${fi % 2 === 0 ? "blue" : "purple"}">
+            <div class="callout-head">
+              <span class="callout-tag">定理 / 公式 · ${escHtml(fam.knowledge.title)}</span>
+              <button class="maki-btn ${done ? "done" : ""}" onclick="toggleMastered('${mKey}')">${done ? "✓ 已掌握本节" : "标记本节为已掌握"}</button>
+            </div>
+            <div class="chain-line">前置 → 后续：${escHtml(fam.knowledge.chain)}</div>
+            <div>${renderMathMarkdown(fam.knowledge.content)}</div>
+          </div>
+
+          <div class="callout orange">
+            <div class="callout-head"><span class="callout-tag">提醒 / 本节易错边界</span></div>
+            <ul style="margin:0;padding-left:18px;">${fam.pitfalls.map((p) => `<li>${renderMathMarkdown(p)}</li>`).join("")}</ul>
+          </div>
+
+          <div style="font-weight:700;margin:14px 0 10px;">🎯 同类真题逐题精讲（先看最优解与共通思想，再对照原站解析）</div>
+          ${qs.map((q) => {
+            const raw = state.exams.find((r) => r.id === q.id);
+            const qKey = `q:${q.id}`;
+            const qDone = state.mastered.has(qKey);
+            return `
+              <div class="deep-q-card">
+                <div class="deep-q-head">
+                  <span class="pill-badge" style="margin:0;">#${q.id}</span>
+                  <span class="pill-badge purple" style="margin:0;">${escHtml(q.badge)}</span>
+                  <span class="modal-stars">${"★".repeat(q.stars)}${"☆".repeat(5 - q.stars)}</span>
+                  <span style="flex:1"></span>
+                  <button class="maki-btn ${qDone ? "done" : ""}" onclick="toggleMastered('${qKey}')">${qDone ? "✓ 已复盘" : "标记已复盘"}</button>
+                </div>
+
+                ${raw ? `<div style="font-size:15px;margin:8px 0;overflow-x:auto;">${renderMathMarkdown(raw.q, raw.id)}</div>` : ""}
+                ${raw && raw.o && raw.o.length ? `<div class="q-opts">${raw.o.map((o) => {
+                  const lbl = typeof o === "object" && o !== null ? o.label : "";
+                  const txt = typeof o === "object" && o !== null ? o.text : o;
+                  return `<div class="q-opt">${lbl ? `<strong>${escHtml(lbl)}.</strong> ` : ""}${renderMathMarkdown(txt, raw.id)}</div>`;
+                }).join("")}</div>` : ""}
+
+                <div class="deep-grid">
+                  <div class="deep-box kp"><strong>📌 考点：</strong>${renderMathMarkdown(q.kp, q.id)}</div>
+                  <div class="deep-box opt"><strong>⚡ 最优解 / 原解审查：</strong>${renderMathMarkdown(q.opt, q.id)}</div>
+                  <div class="deep-box common"><strong>🔗 手法与同类题共通之处：</strong>${renderMathMarkdown(q.common, q.id)}</div>
+                  <div class="deep-box pit"><strong>⚠️ 本题易错点：</strong>${renderMathMarkdown(q.pitfall, q.id)}</div>
+                </div>
+
+                ${raw ? `
+                  <details style="margin-top:8px;">
+                    <summary style="cursor:pointer;font-size:12.5px;color:var(--muted);font-weight:600;">展开原题答案与原站解析对照</summary>
+                    <div class="acc-body" style="margin-top:6px;border:1px solid var(--border);border-radius:8px;background:var(--surface-subtle);">
+                      <div><strong>原题答案：</strong>${renderMathMarkdown(raw.a, raw.id)}</div>
+                      <div style="margin-top:6px;">${renderMathMarkdown(raw.x, raw.id)}</div>
+                    </div>
+                  </details>
+                ` : ""}
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `;
+    }).join("")}
+  `;
+}
+
 function renderSubjectLecture(subjKey) {
   const subj = state.notes.subjects.find((s) => s.key === subjKey);
   if (!subj) return "";
   const ch = subj.chapters[Math.min(state.chapIdx, subj.chapters.length - 1)];
+
+  if (subjKey === "高等数学" && ch.name === "极限" && state.limitDeep) {
+    return renderDeepChapter(state.limitDeep);
+  }
 
   // Group all real exam questions in this chapter by subtopic (r.sub)
   const chapExams = state.exams.filter((r) => r.subj === subjKey && r.ch === ch.name);
@@ -748,6 +840,17 @@ window.jumpBank = (opts) => {
   setTimeout(() => { const inp = document.getElementById("searchInput"); if (inp) inp.focus(); }, 30);
 };
 
+document.getElementById("examPills").addEventListener("click", (e) => {
+  const btn = e.target.closest(".exam-pill");
+  if (!btn) return;
+  const ex = btn.dataset.exam;
+  state.globalExam = ex;
+  state.filters.exam = ex;
+  state.kmFilter.exam = ex === "数一" ? 1 : (ex === "数二" ? 2 : (ex === "数三" ? 3 : 0));
+  document.querySelectorAll(".exam-pill").forEach((b) => b.classList.toggle("active", b === btn));
+  render();
+});
+
 document.getElementById("railNav").addEventListener("click", (e) => {
   const btn = e.target.closest(".rail-item");
   if (!btn) return;
@@ -785,16 +888,19 @@ if (window.__FP_NOTES__ && window.__FP_EXAMS__ && window.__FP_KMAP__) {
   state.notes = window.__FP_NOTES__;
   state.exams = window.__FP_EXAMS__;
   state.kmap = window.__FP_KMAP__;
+  state.limitDeep = window.__FP_LIMIT_DEEP__ || null;
   render();
 } else {
   Promise.all([
     fetch("./data/review_notes.json").then((r) => r.json()),
     fetch("./data/real_exams.json").then((r) => r.json()),
     fetch("./data/knowledge_map.json").then((r) => r.json()),
-  ]).then(([notes, exams, kmap]) => {
+    fetch("./data/limit_deep_review.json").then((r) => r.json()).catch(() => null),
+  ]).then(([notes, exams, kmap, limitDeep]) => {
     state.notes = notes;
     state.exams = exams;
     state.kmap = kmap;
+    state.limitDeep = limitDeep;
     render();
   }).catch((err) => {
     document.getElementById("appRoot").innerHTML = `<div class="loading-box">数据加载失败：${escHtml(err.message)}</div>`;
