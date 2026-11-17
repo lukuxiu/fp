@@ -85,7 +85,7 @@ function renderOverview() {
         <span class="badge teal">先知识 → 再易错 → 后真题与最优解</span>
       </div>
       <p>1. 点击上方 <b>高等数学 / 线性代数 / 概率统计</b>，按网站章节树先看 <b>📘 知识卡片</b> 与 <b>⚠️ 提醒/易错</b>，再看对应 <b>🎯 典型真题最优解替换</b> 与 <b>🔗 同类题手法共通之处</b>。</p>
-      <p>2. 点击 <b>🔍 全量真题库</b>，可按考种（数一/二/三）、年代（含 1987–2009 早年真题与 2024–2026 补全真题）、学科章节、985 严选、或题号 `#ID` 检索全部 <b>${total}</b> 道真题。</p>
+      <p>2. 点击 <b>🔍 全量真题库</b>，可按考种（数一/二/三）、年代（含 1987–2009 早年真题与 2024–2026 补全真题）、学科章节、985 严选、或题号 <code>#ID</code> 检索全部 <b>${total}</b> 道真题。</p>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">
         <button class="btn-sm" onclick="jumpBank({era:'recent'})">查看近十年真题 (2017–2026)</button>
         <button class="btn-sm" onclick="jumpBank({era:'early'})">查看早年经典 (1987–2009)</button>
