@@ -334,12 +334,14 @@ function renderDeepChapter(deep) {
             <ul style="margin:0;padding-left:18px;">${fam.pitfalls.map((p) => `<li>${renderMathMarkdown(p)}</li>`).join("")}</ul>
           </div>
 
-          <div style="font-weight:700;margin:14px 0 10px;">🎯 同类真题逐题精讲（先看最优解与共通思想，再对照原站解析）</div>
-          ${qs.map((q) => {
+          <div style="font-weight:700;margin:14px 0 10px;">🎯 同类真题逐题精讲（按「同构手法对照组」紧邻排列，先看最优解再对照原站解析）</div>
+          ${qs.map((q, qi) => {
             const raw = state.exams.find((r) => r.id === q.id);
             const qKey = `q:${q.id}`;
             const qDone = state.mastered.has(qKey);
+            const showGroupHeader = q.group && (qi === 0 || qs[qi - 1].group !== q.group);
             return `
+              ${showGroupHeader ? `<div style="margin:14px 0 8px;padding:6px 10px;border-radius:6px;background:var(--surface-subtle);border-left:3px solid var(--teal);font-size:13px;font-weight:700;color:var(--teal);">🔀 ${escHtml(q.group)}</div>` : ""}
               <div class="deep-q-card">
                 <div class="deep-q-head">
                   <span class="pill-badge" style="margin:0;">#${q.id}</span>
