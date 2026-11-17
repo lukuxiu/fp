@@ -5,7 +5,7 @@ const state = {
   notes: null,
   exams: [],
   kmap: [],
-  limitDeep: null,
+  deepMap: {},
   mastered: new Set(JSON.parse(localStorage.getItem("fp_mastered_v1") || "[]")),
   filters: { q: "", exam: "all", era: "all", subj: "all", chap: "all", coreOnly: false },
   kmFilter: { q: "", status: "all", exam: 0 },
@@ -125,16 +125,19 @@ function updateRail() {
   if (!subj) { rc.innerHTML = ""; return; }
   rc.innerHTML = `
     <div class="rail-section-label">${escHtml(subj.key)} · 章节</div>
-    ${subj.chapters.map((c, i) => `
-      <button class="rail-chap-btn ${i === state.chapIdx ? "active" : ""}" onclick="selectChap(${i})">${escHtml(c.name)}</button>
-      ${i === state.chapIdx && subj.key === "高等数学" && c.name === "极限" && state.limitDeep ? `
-        <div style="padding-left:10px;margin:2px 0 6px;border-left:2px solid var(--border);">
-          ${state.limitDeep.families.map((fam, fi) => `
-            <button class="rail-chap-btn" style="font-size:11.5px;padding:4px 8px;color:var(--muted);" onclick="scrollToFamily(${fi})">${escHtml(fam.name.split("（")[0])}</button>
-          `).join("")}
-        </div>
-      ` : ""}
-    `).join("")}
+    ${subj.chapters.map((c, i) => {
+      const deep = state.deepMap[`${subj.key}::${c.name}`];
+      return `
+        <button class="rail-chap-btn ${i === state.chapIdx ? "active" : ""}" onclick="selectChap(${i})">${escHtml(c.name)}</button>
+        ${i === state.chapIdx && deep ? `
+          <div style="padding-left:10px;margin:2px 0 6px;border-left:2px solid var(--border);">
+            ${deep.families.map((fam, fi) => `
+              <button class="rail-chap-btn" style="font-size:11.5px;padding:4px 8px;color:var(--muted);" onclick="scrollToFamily(${fi})">${escHtml(fam.name.split("（")[0])}</button>
+            `).join("")}
+          </div>
+        ` : ""}
+      `;
+    }).join("")}
   `;
 }
 
@@ -404,8 +407,9 @@ function renderSubjectLecture(subjKey) {
   if (!subj) return "";
   const ch = subj.chapters[Math.min(state.chapIdx, subj.chapters.length - 1)];
 
-  if (subjKey === "高等数学" && ch.name === "极限" && state.limitDeep) {
-    return renderDeepChapter(state.limitDeep);
+  const deep = state.deepMap[`${subjKey}::${ch.name}`];
+  if (deep) {
+    return renderDeepChapter(deep);
   }
 
   // Group all real exam questions in this chapter by subtopic (r.sub)
@@ -910,19 +914,19 @@ if (window.__FP_NOTES__ && window.__FP_EXAMS__ && window.__FP_KMAP__) {
   state.notes = window.__FP_NOTES__;
   state.exams = window.__FP_EXAMS__;
   state.kmap = window.__FP_KMAP__;
-  state.limitDeep = window.__FP_LIMIT_DEEP__ || null;
+  state.deepMap = window.__FP_DEEP_MAP__ || {};
   render();
 } else {
   Promise.all([
     fetch("./data/review_notes.json").then((r) => r.json()),
     fetch("./data/real_exams.json").then((r) => r.json()),
     fetch("./data/knowledge_map.json").then((r) => r.json()),
-    fetch("./data/limit_deep_review.json").then((r) => r.json()).catch(() => null),
-  ]).then(([notes, exams, kmap, limitDeep]) => {
+    fetch("./data/deep_chapters.json").then((r) => r.json()).catch(() => ({})),
+  ]).then(([notes, exams, kmap, deepMap]) => {
     state.notes = notes;
     state.exams = exams;
     state.kmap = kmap;
-    state.limitDeep = limitDeep;
+    state.deepMap = deepMap;
     render();
   }).catch((err) => {
     document.getElementById("appRoot").innerHTML = `<div class="loading-box">数据加载失败：${escHtml(err.message)}</div>`;
